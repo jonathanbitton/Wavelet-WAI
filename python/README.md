@@ -16,6 +16,7 @@ See Example_Script.ipynb for a detailed case-study.
 ## File Structure
 python/
 ├── cwtransform.py         # CWT module
+
 ├── Example_Script.ipynb   # Example Notebook
 ├── data_utils.py          # Data functions
 ├── wt_utils.py            # WT functions
