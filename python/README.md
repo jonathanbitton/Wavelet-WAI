@@ -26,13 +26,13 @@ python/
 ├── data/                    # Folder for example datasets (optional)
 │   └── GPPdata.txt          # Example data file
 ├── notebooks/               # Folder for Jupyter notebooks
-│   └── aExample_Script.ipynb # Example notebook
+│   └── Example.ipynb        # Example notebook
 └── src/                     # Source code folder
-   ├── __init__.py          # Package initialization file
-   ├── cwtransform.py       # Main module for wavelet transform
-   ├── wt_utils.py          # Utility functions for wavelets
-   ├── data_utils.py        # Utility functions for data handling
-   └── wai_utils.py         # Utility functions for wavelet area interpretation
+    ├── __init__.py          # Package initialization file
+    ├── cwtransform.py       # Main module for wavelet transform
+    ├── wt_utils.py          # Utility functions for wavelets
+    ├── data_utils.py        # Utility functions for data handling
+    └── wai_utils.py         # Utility functions for wavelet area interpretation
 ```
 
 ## License
