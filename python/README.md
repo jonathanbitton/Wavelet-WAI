@@ -1,6 +1,5 @@
 ## **Description**
 This project contains a fully customizable continuous wavelet transform implementation for python.
-
 It presents a CWT-based analysis, using the **Wavelet Area Interpretation**, and its possible applications for python.
 
 ## Installation
