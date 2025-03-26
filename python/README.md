@@ -8,8 +8,7 @@
    pip install -r numpy, pandas, scipy, matplotlib, pyfftw
 
 ## Usage
-Run the example notebook, and make changes according to input data:
-python Example_Script.ipynb
+Run the example notebook (Example_Script.ipynb), and make changes according to input data. 
 
 ## Example Code
 See Example_Script.ipynb for a detailed case-study.
