@@ -6,7 +6,6 @@ It presents a CWT-based analysis, using the **Wavelet Area Interpretation**, and
 1. Clone the repository:
    ```bash
    git clone https://github.com/jonathanbitton/Wavelets-WAI/python.git
-   cd python
 2. install dependencies:
    ```bash
    pip install -r requirements.txt
