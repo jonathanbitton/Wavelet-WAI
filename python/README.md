@@ -9,7 +9,7 @@ It presents a CWT-based analysis, using the **Wavelet Area Interpretation**, and
    cd python
 2. install dependencies:
    ```bash
-   pip install -r numpy, pandas, scipy, matplotlib, pyfftw
+   pip install -r requirements.txt
 
 ## Usage
 Run the example notebook (Example_Script.ipynb), and make changes according to input data. 
