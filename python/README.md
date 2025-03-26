@@ -1,1 +1,29 @@
+## Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/jonathanbitton/Wavelets-WAI/python.git
+   cd python
+2. install dependencies:
+   pip install -r numpy, pandas, scipy, matplotlib, pyfftw
 
+## Usage
+Run the example script:
+python Example_Script.py
+
+## Example Code
+See Example_Script.ipynb for a detailed case-study.
+
+## File Structure
+python/
+├── cwtransform.py         # CWT module
+├── Example_Script.ipynb   # Example Notebook
+├── data_utils.py          # Data functions
+├── wt_utils.py            # WT functions
+├── wai_utils.py           # WAI functions
+├── data/                  # Data folder
+│   └── GPPdata.txt
+└── README.md              # Project documentation
+
+## License
+This project is licensed under the Apache 2.0 License.
+---
