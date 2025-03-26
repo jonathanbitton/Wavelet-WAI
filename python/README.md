@@ -22,10 +22,15 @@ python/
 ├── Example_Script.ipynb   # Example Notebook
 
 ├── data_utils.py          # Data functions
+
 ├── wt_utils.py            # WT functions
+
 ├── wai_utils.py           # WAI functions
+
 ├── data/                  # Data folder
+
 │   └── GPPdata.txt
+
 └── README.md              # Project documentation
 
 ## License
