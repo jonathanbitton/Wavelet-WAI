@@ -20,27 +20,38 @@ See Example.ipynb for a detailed case-study.
 python/
 
 python/
-│
+
 ├── README.md                # Project description and usage instructions
+
 ├── requirements.txt         # List of dependencies
+
 ├── setup.py                 # For packaging and installation (if publishing to PyPI)
+
 ├── .gitignore               # Files and folders to ignore in Git
-│
+
 ├── data/                    # Folder for example datasets (optional)
+
 │   └── GPPdata.txt          # Example data file
-│
+
 ├── notebooks/               # Folder for Jupyter notebooks
+
 │   └── aExample_Script.ipynb # Example notebook
-│
+
 ├── src/                     # Source code folder
+
 │   ├── __init__.py          # Package initialization file
+
 │   ├── cwtransform.py       # Main module for wavelet transform
+
 │   ├── wt_utils.py          # Utility functions for wavelets
+
 │   ├── data_utils.py        # Utility functions for data handling
+
 │   └── wai_utils.py         # Utility functions for wavelet area interpretation
-│
+
 └── tests/                   # Folder for unit tests
-    └── test_cwtransform.py  # Unit tests for cwtransform.py
+
+   └── test_cwtransform.py  # Unit tests for cwtransform.py
 
 ├── __init__.py            # Init file
 
