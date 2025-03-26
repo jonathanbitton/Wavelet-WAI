@@ -1,7 +1,7 @@
 # Wavelet-WAI
 
 ## Overview
-This project provides a Python-based toolkit for performing Continuous Wavelet Transform (CWT) analysis on (time-)series data. The toolkit is designed to facilitate signal processing, feature extraction, and visualization of wavelet coefficients, making it ideal for researchers and engineers working in fields such as signal processing, time-frequency analysis, and data science. 
+This project provides a matlab- and python-based toolkit for performing Continuous Wavelet Transform (CWT) analysis on (time-)series data. The toolkit is designed to facilitate signal processing, feature extraction, and visualization of wavelet coefficients, making it ideal for researchers and engineers working in fields such as signal processing, time-frequency analysis, and data science. 
 It introduces the **Wavelet Area Interpretation (WAI)**, a visual approach to interpret wavelet coefficients based on areas contributing to their calculation, and exapands on possible applications in ecology.
 
 The repository includes, in matlab and python:
