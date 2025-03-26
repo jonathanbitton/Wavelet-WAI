@@ -1,3 +1,7 @@
+## **Description**
+This project contains a fully customizable continuous wavelet transform implementation for python.\n
+It presents a CWT-based analysis, using the **Wavelet Area Interpretation**, and its possible applications for python.
+
 ## Installation
 1. Clone the repository:
    ```bash
