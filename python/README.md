@@ -11,10 +11,10 @@ It presents a CWT-based analysis, using the **Wavelet Area Interpretation**, and
    pip install -r requirements.txt
 
 ## Usage
-Run the example notebook (Example.ipynb), and make changes according to input data. 
+Run the example notebook (notebooks/Example.ipynb), and make changes according to input data. 
 
 ## Example Code
-See Example.ipynb for a detailed case-study.
+See notebooks/Example.ipynb for a detailed case-study.
 
 ## File Structure
 ```
@@ -37,4 +37,3 @@ python/
 
 ## License
 This project is licensed under the Apache 2.0 License.
-
