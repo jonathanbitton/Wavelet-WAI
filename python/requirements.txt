@@ -1,0 +1,16 @@
+# Core dependencies
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Optional dependencies for performance and visualization
+pyfftw>=0.12.0  # For faster FFT computation (optional)
+matplotlib>=3.4.0  # For plotting scalograms and visualizations
+
+# Local modules (ensure these are present in the repository)
+# wt_utils
+# data_utils
+# wai_utils
+
+# Additional dependencies (if used in other modules/notebooks)
+scipy>=1.7.0  # Commonly used in signal processing
+jupyterlab>=3.0.0  # If notebooks are included in the repository
