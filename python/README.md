@@ -22,7 +22,7 @@ python/
 
 ├── cwtransform.py         # CWT module
 
-├── Example_Script.ipynb   # Example Notebook
+├── Example.ipynb   # Example Notebook
 
 ├── data_utils.py          # Data functions
 
