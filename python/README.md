@@ -21,9 +21,9 @@ See Example.ipynb for a detailed case-study.
 python/
 ├── README.md                # Project description and usage instructions
 ├── requirements.txt         # List of dependencies
-├── setup.py                 # For packaging and installation (if publishing to PyPI)
+├── setup.py                 # For packaging and installation
 ├── .gitignore               # Files and folders to ignore in Git
-├── data/                    # Folder for example datasets (optional)
+├── data/                    # Folder for example datasets
 │   └── GPPdata.txt          # Example data file
 ├── notebooks/               # Folder for Jupyter notebooks
 │   └── Example.ipynb        # Example notebook
