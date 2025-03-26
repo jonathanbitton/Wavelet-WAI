@@ -8,8 +8,8 @@
    pip install -r numpy, pandas, scipy, matplotlib, pyfftw
 
 ## Usage
-Run the example script:
-python Example_Script.py
+Run the example notebook, and make changes according to input data:
+python Example_Script.ipynb
 
 ## Example Code
 See Example_Script.ipynb for a detailed case-study.
@@ -35,4 +35,4 @@ python/
 
 ## License
 This project is licensed under the Apache 2.0 License.
----
+
