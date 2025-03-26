@@ -9,10 +9,10 @@ cd matlab
 ```
 
 ## Usage
-Run the example script (Example_Script.m), and make changes according to input data. 
+Run the example script (scripts/Example_Script.m), and make changes according to input data. 
 
 ## Example Code
-See Example_Script.m for an application or Example.ipynb from the python folder for a detailed case-study.
+See scripts/Example_Script.m for an application or notebooks/Example.ipynb from the python folder for a detailed case-study.
 
 ## File Structure
 ```
