@@ -17,7 +17,7 @@ env/
 *.log
 *.tmp
 
-# Data files (optional, if you don't want to track them)
+# Data files
 data/
 
 # Build artifacts
