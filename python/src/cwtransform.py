@@ -36,9 +36,6 @@ class Wavelet_Transform():
         are used for cross wavelet transform. If y is a DataFrame/Series, time information is extracted
         from relevant columns ('time' or 'datetime') when available, or from the index (if datetime index).
         See function 'data_utils.extract_signal_and_time' for details.
-
-    n : int, optional (default=None)
-        Number of samples in the signal. Automatically calculated if y is provided.
     
     dt : float, int, optional (default=1)
         Time step between consecutive samples. Automatically calculated
@@ -179,14 +176,22 @@ class Wavelet_Transform():
         
     plotunits : str, optional (default=None)
         Units for the time axis in plots (e.g., 'sec', 'min', 'hour', 'day').
+
+    Processing Parameters
+    --------------------
+    use_pyfftw : bool, optional (default=False)
+        Whether to use pyfftw for FFT.
+    parallel_proc : bool, optional (default=False)
+        Whether to use parallel processing for computing wavelet coefficients.
+    workers : int, optional (default=None)
+        Number of workers for parallel processing. If None, uses the number of CPU cores - 1.
+    chunk_size : int, optional (default=None)
+        Chunk size for parallel processing.
         
     Attributes
     ----------
     wave : numpy.ndarray
         Complex wavelet coefficients
-        
-    power : numpy.ndarray
-        Wavelet power (squared magnitude of coefficients)
         
     scales : numpy.ndarray
         Scales used for the transform
@@ -234,9 +239,6 @@ class Wavelet_Transform():
         # Scales and periods/frequencies
         if hasattr(self, 'scales'):
             self.convert_scales()
-        elif self.params['n'] is not None:
-            self.compute_scales(**self.scale_param)
-            del self.scale_param
 
         # Run cwt if signal provided    
         if y is not None:
@@ -247,10 +249,7 @@ class Wavelet_Transform():
 
     def cwt(self, 
             y: Union["ArrayLike", "pd.Series", "pd.DataFrame"], 
-            xdata: Optional[Union["ArrayLike", "pd.Series", "pd.DatetimeIndex", "DatetimeArray"]] = None, 
-            chunk_size: Optional[int] = None, 
-            use_pyfftw: bool = False, 
-            max_workers: Optional[int] = None):
+            xdata: Optional[Union["ArrayLike", "pd.Series", "pd.DatetimeIndex", "DatetimeArray"]] = None):
         """
         Compute the Continuous Wavelet Transform of a signal.
         
@@ -262,12 +261,6 @@ class Wavelet_Transform():
         xdata : array_like, pandas.Series, pandas.DatetimeIndex, pandas.arrays.DatetimeArray, optional (default=None)
             X-axis data for plotting. If xdata is missing and y is a DataFrame/Series, time information is extracted
             from relevant columns ('time' or 'datetime') when available, or from the index (if datetime index).
-        chunk_size : int, optional (default=None)
-            Chunk size for parallel processing.
-        use_pyfftw : bool, optional (default=False)
-            Whether to use pyfftw for FFT computation.
-        max_workers : int, optional (default=None)
-            Maximum number of workers for parallel processing.
         
             
         Returns
@@ -300,7 +293,7 @@ class Wavelet_Transform():
             del self.scale_param
 
         # Compute wavelet 
-        self.compute_WT(y_ext, chunk_size, use_pyfftw, max_workers)
+        self.compute_WT(y_ext)
 
         # Remove padding
         if 'remove_padding' in self.params:
@@ -322,7 +315,7 @@ class Wavelet_Transform():
 
         # Cross wavelet transform
         if compute_xwt: 
-            self.xwt(y2, chunk_size, use_pyfftw, max_workers)
+            self.xwt(y2)
         
         
     def import_arguments(self, **args):
@@ -340,7 +333,7 @@ class Wavelet_Transform():
         This method imports the arguments and sets the parameters for the wavelet transform.
         It uses the `get_args` function from the `data_utils` module to extract the parameters.
         '''
-        self.params, self.wav_params, scale_param, self.flags, self.xdata = data_utils.get_args(**args)
+        self.params, self.wav_params, scale_param, self.flags, self.processing, self.xdata = data_utils.get_args(**args)
         
         if isinstance(scale_param, dict):
             self.scale_param = scale_param
@@ -489,39 +482,31 @@ class Wavelet_Transform():
         # Padding
         self.params['apply_padding'], self.params['remove_padding'], self.params['n_ext'] = data_utils.sig_length_and_padding(self.params['n'], self.params['pad'], self.params['padmode'])
 
-    def compute_WT(self, 
-                   y_ext: np.ndarray, 
-                   chunk_size: Optional[int] = None, 
-                   use_pyfftw: bool = False, 
-                   max_workers: Optional[int] = None):
+    def compute_WT(self, y_ext: np.ndarray):
         '''
-        Define wavelet and compute wavelet coefficients using fft with memory management
+        Define wavelet and compute wavelet coefficients using fft with parallelization and/or memory management
         
         Parameters
         ----------
         y_ext : numpy.ndarray
             Input (padded) signal to analyze.
-        chunk_size : int, optional (default=None)
-            Size of chunks to process at once to save memory. If None (default),
-            process all scales at once. Use this for very large scale arrays.
-        use_pyfftw : bool, optional (default=False)
-            Whether to use pyfftw for faster FFT computation.
-        max_workers : int, optional (default=None)
-            Maximum number of workers to use for parallel computation.
         
         Notes
         -----
-        This method is useful for processing large datasets that do not fit in memory.
-        It processes the signal in chunks, which can be specified by the `chunk_size` parameter.
-        For performance, it is recommended to use `use_pyfftw=True` and `max_workers` to parallelize the computation.
-        Package pyfftw must be installed for `use_pyfftw=True`.
+        This method is compatible with pyfftw and parallel processing.
+        It uses pyfftw if installed and requested (`use_pyfftw` parameter) for faster FFT computation.
+        The `parallel_proc` or `workers` parameter allow for parallel processing.
+        If `chunk_size` is specified, it will process the signal in chunks.
+        This is useful for processing large datasets that do not fit in memory.
         '''
         # Compute wavelet
         if not hasattr(self, 'psi'):
             self.psi = wt_utils.compute_psi(self.params['n_ext'], self.params['dt'], self.wavelet, self.scales)
 
         # Compute wavelet coefficients     
-        self.wave = wt_utils.compute_wavelet_coef(y_ext, self.psi, chunk_size, use_pyfftw, max_workers)   
+        self.wave = wt_utils.compute_wavelet_coef(y_ext, self.psi, self.processing['use_pyfftw'],
+                                                  self.processing['parallel_proc'], self.processing['workers'],
+                                                  self.processing['chunk_size'])   
     
     def compute_coi(self, 
                    coi_type: str = 'analytic', 
@@ -585,10 +570,7 @@ class Wavelet_Transform():
                                             self.wave, self.periods, lag1)
     
     def xwt(self, 
-            y2: Union["ArrayLike", "pd.Series", "pd.DataFrame"], 
-            chunk_size: Optional[int] = None, 
-            use_pyfftw: bool = False, 
-            max_workers: Optional[int] = None,
+            y2: Union["ArrayLike", "pd.Series", "pd.DataFrame"],
             y1: Optional[Union["ArrayLike", "pd.Series", "pd.DataFrame"]] = None):
 
         '''
@@ -612,7 +594,7 @@ class Wavelet_Transform():
             if not hasattr(self, 'wave'):
                 raise AttributeError('Need to compute cwt for a signal before assessing cross wavelet transform')
         else:
-            self.cwt(y1, chunk_size=chunk_size, use_pyfftw=use_pyfftw, max_workers=max_workers)
+            self.cwt(y1)
 
         # Wavelet transform of y2
         # Extract y2
@@ -624,7 +606,9 @@ class Wavelet_Transform():
         y2_ext = self.signal_and_padding(y2)
 
         # Compute wavelet coefficients     
-        self.wave2 = wt_utils.compute_wavelet_coef(y2_ext, self.psi, chunk_size, use_pyfftw, max_workers)   
+        self.wave2 = wt_utils.compute_wavelet_coef(y2_ext, self.psi, self.processing['use_pyfftw'],
+                                                  self.processing['parallel_proc'], self.processing['workers'],
+                                                  self.processing['chunk_size'])   
 
         # Remove padding
         if self.params['remove_padding'] is not None:

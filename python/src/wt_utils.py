@@ -696,9 +696,10 @@ def compute_psi(n: int,
 
 def compute_wavelet_coef(x: np.ndarray, 
                          psiscaled_ft: np.ndarray, 
-                         chunk_size: Optional[int] = None, 
-                         use_pyfftw: bool = False, 
-                         max_workers: Optional[int] = None) -> np.ndarray:
+                         use_pyfftw: bool = False,
+                         parallel_proc: bool = False, 
+                         workers: Optional[int] = None,
+                         chunk_size: Optional[int] = None) -> np.ndarray:
     """
     Compute wavelet coefficients using the FFT convolution method with memory management.
     
@@ -708,15 +709,19 @@ def compute_wavelet_coef(x: np.ndarray,
         Input signal to analyze.
     psiscaled_ft : numpy.ndarray
         Scaled wavelet in Fourier space, with shape (n_scales, signal_length).
-    chunk_size : int, optional (default=None)
-        Size of chunks to process at once to save memory. If None,
-        process all scales at once. Use this for very large scale arrays.
     use_pyfftw : bool, optional (default=False)
         Whether to use the pyfftw library if available for faster FFT computation.
         If True but pyfftw is not installed, falls back to scipy.
-    max_workers : int, optional (default=None)
-        Maximum number of worker processes for parallel computation of chunks.
-        If None, uses the number of CPU cores - 1. Only used when chunk_size is set.
+    parallel_proc : bool, optional (default=False)
+        Whether to use parallel computation for FFT/IFFT. If True, requires the
+        multiprocessing library and may not work in all environments.
+    workers : int, optional (default=None)
+        (Maximum) number of worker processes for parallel computation of fft. 
+        If chunk_size is set, this is the number of workers per chunk.
+        If None, uses the number of CPU cores - 1.
+    chunk_size : int, optional (default=None)
+        Size of chunks to process at once to save memory. If None,
+        process all scales at once. Use this for very large scale arrays (Memory constraints).
     
     Returns
     -------
@@ -729,9 +734,10 @@ def compute_wavelet_coef(x: np.ndarray,
     convolution method, which is more efficient than direct convolution for large signals.
     
     The implementation includes multiple optimizations:
-    - Automatic memory management by reducing precision if memory errors occur
-    - Optional chunked processing for large scale arrays
+    - Parallel processing of FFT computation if requested
     - Option to use pyfftw for faster FFT computation
+    - Automatic memory management by reducing precision if memory errors occur
+    - Optional chunked processing for large scale arrays that do not fit in memory
     - Parallel processing of chunks when appropriate
     
     The computation follows these steps:
@@ -739,37 +745,37 @@ def compute_wavelet_coef(x: np.ndarray,
     2. Multiplication with scaled wavelets in Fourier space (per scale or chunk)
     3. Inverse FFT to obtain wavelet coefficients
     
-    For extremely large datasets, specify a chunk_size to process scales in batches.
+    To tackle memory limitations, specify a chunk_size to process scales in batches.
     """
     import scipy as sp
     
     # Optional imports for optimization
-    parallel_processing = False
     fftw_available = False
     
     # Try to import pyFFTW for faster FFT if requested
     if use_pyfftw:
         try:
             import pyfftw
-            from multiprocessing import cpu_count
             fftw_available = True
-            # PyFFTW setup for better performance
-            pyfftw.interfaces.cache.enable()
-            threads = max(1, cpu_count() - 1)  # Leave one core free
+            pyfftw.interfaces.cache.enable() # PyFFTW setup for better performance
         except ImportError:
             pass
     
-    # Try to import concurrent.futures for parallel processing if chunking is used
-    if chunk_size is not None:
-        try:
-            from concurrent.futures import ProcessPoolExecutor
-            from multiprocessing import cpu_count
-            parallel_processing = True
-            if max_workers is None:
-                max_workers = max(1, cpu_count() - 1)  # Leave one core free
-        except ImportError:
-            pass
-    
+    if parallel_proc:
+        # Try setting number of workers
+        if workers is None:
+            try:
+                from multiprocessing import cpu_count
+                workers = max(1, cpu_count() - 1) # Leave one core free
+            except ImportError:
+                parallel_proc = False
+        if chunk_size is not None:
+            # Try to import concurrent.futures for parallel processing if chunking is used
+            try:
+                from concurrent.futures import ProcessPoolExecutor
+            except ImportError:
+                parallel_proc = False   
+
     # Get the number of scales and signal length
     n_scales, n_signal = psiscaled_ft.shape
     
@@ -777,13 +783,13 @@ def compute_wavelet_coef(x: np.ndarray,
     try:
         # Try using FFTW if available and requested
         if fftw_available:
-            y_ft = pyfftw.interfaces.scipy_fftpack.fft(x, threads=threads)
+            y_ft = pyfftw.interfaces.scipy_fftpack.fft(x, threads=workers)
         else:
-            y_ft = sp.fft.fft(x)#workers=-1
+            y_ft = sp.fft.fft(x, workers=workers)
     except Exception as e:
         # Fall back to scipy's FFT
         print(f"Warning: Error during FFT computation: {e}. Using scipy fallback.")
-        y_ft = sp.fft.fft(x)
+        y_ft = sp.fft.fft(x, workers=workers)
     
     # Prepare output array for results
     try:
@@ -821,56 +827,14 @@ def compute_wavelet_coef(x: np.ndarray,
             else:
                 raise ValueError('Invalid chunk_size or n_scales. Must be positive values.')
     
-    # Function to process a single chunk of scales
-    def process_chunk(chunk_indices):
-        chunk_start, chunk_end = chunk_indices
-        chunk_psiscaled_ft = psiscaled_ft[chunk_start:chunk_end]
-        
-        try:
-            # Try computation with full precision
-            if fftw_available:
-                chunk_wave = pyfftw.interfaces.scipy_fftpack.ifft(
-                    y_ft * chunk_psiscaled_ft, axis=1, threads=threads)
-            else:
-                chunk_wave = sp.fft.ifft(y_ft * chunk_psiscaled_ft, axis=1)
-        except MemoryError:
-            # If memory error, reduce precision
-            print(f'Reducing precision for chunk {chunk_start}-{chunk_end} due to memory shortage...')
-            
-            # Convert to lower precision
-            chunk_psiscaled_ft_reduced = chunk_psiscaled_ft
-            y_ft_reduced = y_ft
-            
-            if chunk_psiscaled_ft.dtype == np.complex128:
-                chunk_psiscaled_ft_reduced = chunk_psiscaled_ft.astype(np.complex64)
-            
-            if y_ft.dtype == np.complex128:
-                y_ft_reduced = y_ft.astype(np.complex64)
-            
-            try:
-                # Try with reduced precision
-                if fftw_available:
-                    chunk_wave = pyfftw.interfaces.scipy_fftpack.ifft(
-                        y_ft_reduced * chunk_psiscaled_ft_reduced, axis=1, threads=threads)
-                else:
-                    chunk_wave = sp.fft.ifft(y_ft_reduced * chunk_psiscaled_ft_reduced, axis=1)
-            except MemoryError:
-                # If still out of memory, provide specific guidance for this chunk
-                raise MemoryError(
-                    f'Not enough memory to process scales {chunk_start}-{chunk_end}. '
-                    f'Try a smaller chunk_size.'
-                )
-        
-        return chunk_start, chunk_end, chunk_wave
-    
     # Process all scales at once if no chunking is requested
     if chunk_size is None:
         try:
             # Try computation with full precision
             if fftw_available:
-                wave = pyfftw.interfaces.scipy_fftpack.ifft(y_ft * psiscaled_ft, axis=1, threads=threads)
+                wave = pyfftw.interfaces.scipy_fftpack.ifft(y_ft * psiscaled_ft, axis=1, threads=workers)
             else:
-                wave = sp.fft.ifft(y_ft * psiscaled_ft, axis=1)
+                wave = sp.fft.ifft(y_ft * psiscaled_ft, axis=1, workers=workers)
         except MemoryError:
             # If memory error, reduce precision
             print('Reducing precision of arrays to 32 bits due to memory shortage...')
@@ -889,9 +853,9 @@ def compute_wavelet_coef(x: np.ndarray,
                 # Try computation with reduced precision
                 if fftw_available:
                     wave = pyfftw.interfaces.scipy_fftpack.ifft(
-                        y_ft_reduced * psiscaled_ft_reduced, axis=1, threads=threads)
+                        y_ft_reduced * psiscaled_ft_reduced, axis=1, threads=workers)
                 else:
-                    wave = sp.fft.ifft(y_ft_reduced * psiscaled_ft_reduced, axis=1)
+                    wave = sp.fft.ifft(y_ft_reduced * psiscaled_ft_reduced, axis=1, workers=workers)
             except MemoryError:
                 # If still out of memory, suggest chunked processing
                 suggested_chunk = max(1, n_scales // 4)
@@ -899,8 +863,50 @@ def compute_wavelet_coef(x: np.ndarray,
                     'Not enough memory to compute all wavelet coefficients at once. '
                     f'Try setting chunk_size={suggested_chunk} to process in batches.'
                 )
-    else:
-        # Process scales in chunks to save memory
+    else: # Process scales in chunks to save memory
+
+        # Function to process a single chunk of scales
+        def process_chunk(chunk_indices, workers=None):
+            chunk_start, chunk_end = chunk_indices
+            chunk_psiscaled_ft = psiscaled_ft[chunk_start:chunk_end]
+            
+            try:
+                # Try computation with full precision
+                if fftw_available:
+                    chunk_wave = pyfftw.interfaces.scipy_fftpack.ifft(
+                        y_ft * chunk_psiscaled_ft, axis=1, threads=workers)
+                else:
+                    chunk_wave = sp.fft.ifft(y_ft * chunk_psiscaled_ft, axis=1, workers=workers)
+            except MemoryError:
+                # If memory error, reduce precision
+                print(f'Reducing precision for chunk {chunk_start}-{chunk_end} due to memory shortage...')
+                
+                # Convert to lower precision
+                chunk_psiscaled_ft_reduced = chunk_psiscaled_ft
+                y_ft_reduced = y_ft
+                
+                if chunk_psiscaled_ft.dtype == np.complex128:
+                    chunk_psiscaled_ft_reduced = chunk_psiscaled_ft.astype(np.complex64)
+                
+                if y_ft.dtype == np.complex128:
+                    y_ft_reduced = y_ft.astype(np.complex64)
+                
+                try:
+                    # Try with reduced precision
+                    if fftw_available:
+                        chunk_wave = pyfftw.interfaces.scipy_fftpack.ifft(
+                            y_ft_reduced * chunk_psiscaled_ft_reduced, axis=1, threads=workers)
+                    else:
+                        chunk_wave = sp.fft.ifft(y_ft_reduced * chunk_psiscaled_ft_reduced, axis=1, workers=workers)
+                except MemoryError:
+                    # If still out of memory, provide specific guidance for this chunk
+                    raise MemoryError(
+                        f'Not enough memory to process scales {chunk_start}-{chunk_end}. '
+                        f'Try a smaller chunk_size.'
+                    )
+            
+            return chunk_start, chunk_end, chunk_wave
+
         chunk_indices = [(i, min(i + chunk_size, n_scales)) 
                           for i in range(0, n_scales, chunk_size)]
         
@@ -937,10 +943,10 @@ def compute_wavelet_coef(x: np.ndarray,
                         'Try setting an even smaller chunk_size or processing fewer scales at once.'
                     )
         
-        # Process chunks sequentially or in parallel
-        if parallel_processing and len(chunk_indices) > 1:
+        # Process chunks sequentially or in parallel (only if requested)
+        if parallel_proc and len(chunk_indices) > 1:
             # Parallel processing of chunks
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            with ProcessPoolExecutor(max_workers = workers) as executor:
                 futures = [executor.submit(process_chunk, indices) for indices in chunk_indices]
                 
                 for future in futures:
@@ -957,7 +963,7 @@ def compute_wavelet_coef(x: np.ndarray,
         else:
             # Sequential processing of chunks
             for chunk_start, chunk_end in chunk_indices:
-                _, _, chunk_wave = process_chunk((chunk_start, chunk_end))
+                _, _, chunk_wave = process_chunk((chunk_start, chunk_end),workers)
                 wave[chunk_start:chunk_end] = chunk_wave
     
     return wave

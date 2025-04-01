@@ -36,8 +36,6 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         
         - Signal-related parameters:
 
-        n : int, optional
-            Number of samples in the signal.
         ts : float, int, timedelta
             Sampling period (for real time data) or x-axis difference between consecutive samples.
         fs : float, int
@@ -110,7 +108,18 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
             Whether to calculate significance.
         coi : bool
             Whether to calculate cone of influence.
-            
+        use_pyfftw : bool
+            Whether to use pyfftw for FFT.
+        parallel_proc : bool
+            Whether to use parallel processing for computing wavelet coefficients.
+        
+        - Parallelization parameters:
+
+        workers : int
+            Number of workers for parallel processing.
+        chunk_size : int
+            Chunk size for parallel processing.
+
         - Display parameters:
 
         plotunits : str
@@ -132,6 +141,8 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         Temporary scale parameters (permin, smin, permax, smax, pcut) or scales array.
     flags : dict
         Boolean flags (coi, signif, figure).
+    processing : dict
+        Processing parameters (use_pyfftw, parallel_proc, workers, chunk_size).
     xdata : array_like or None
         X-axis data if provided.
         
@@ -145,10 +156,11 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
     Notes
     -----
     - Handles parameter aliases (e.g., s0/smin, pmin/permin) for backward compatibility
-    - Resolves conflicts between exclusive parameters.
+    - Resolves conflicts between exclusive parameters
     - Applies appropriate defaults based on context
     - Calculates derived parameters (e.g., permin from fmax) when needed
     - Validates parameter combinations for consistency
+    - Handles time unit conversions for timedelta objects
     """
     import warnings
 
@@ -175,7 +187,7 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         # Scale parameter control
         'dj': {'default': 1/20, 'type': (float, int), 
             'validate': lambda v: v > 0,
-            'error_msg': 'dj value {value} inadmissible. Please specify a positive value'},
+            'error_msg': 'Invalid dj value "{value}". Please specify a positive value'},
         'permin': {'default': None, 'type': (float, int), 'alias': 'pmin'},
         'fmin': {'default': None, 'type': (float, int)},
         'smin': {'default': None, 'type': (float, int), 'alias': 's0'},
@@ -195,12 +207,7 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         # Parameter limits
         'percentout': {'default': 0.02, 'type': (float, int),
             'validate': lambda v: 0 < v < 1,
-            'error_msg': 'percentout value {value} inadmissible. Please specify a value in range (0,1)'},
-        
-        # Signal length  
-        'n': {'default': None, 'type': int,
-            'validate': lambda v: v > 0,
-            'error_msg': 'n must be a positive integer'},
+            'error_msg': 'Invalid percentout value "{value}". Please specify a value in range (0,1)'},
         
         # Enum-like parameters
         'wname': {
@@ -246,18 +253,26 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         # Wavelet parameters
         's2': {'default': 1, 'type': (float, int),
             'validate': lambda v: v > 0,
-            'error_msg': 's2 value {value} inadmissible. Please specify a positive value'},
+            'error_msg': 'Invalid s2 value "{value}". Please specify a positive value'},
         'w0': {'default': 6, 'type': (float, int),
             'validate': lambda v: v > 0,
-            'error_msg': 'w0 value {value} inadmissible. Please specify a positive value'},
+            'error_msg': 'Invalid w0 value "{value}". Please specify a positive value'},
         
         # Boolean parameters
         'figure': {'default': False, 'type': bool},
         'signif': {'default': False, 'type': bool},
         'coi': {'default': True, 'type': bool},
+        'use_pyfftw': {'default': False, 'type': bool},
+        'parallel_proc': {'default': False, 'type': bool},
+
+        # Parallelization
+        'workers': {'default': None, 'type': int},
+        'chunk_size': {'default': None, 'type': int,
+                    'validate': lambda v: v is None or v > 0,
+                    'error_msg': 'Invalid chunk_size value "{value}". Please specify a positive integer'},
         
         # Data
-        'xdata': {'default': None},
+        'xdata': {'default': None}
     }
 
     # Helper functions for parameter transformation
@@ -432,14 +447,24 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         'figure': args['figure']
     }
 
+    # WT computation
+    processing = {
+        'use_pyfftw': args['use_pyfftw'],
+        'parallel_proc': args['parallel_proc'],
+        'workers': args['workers'],
+        'chunk_size': args['chunk_size']
+    }
+
     # xdata
     xdata = args['xdata']
     
     # All other parameters
-    excluded_keys = set(list(wav_params.keys()) + list(flags.keys()) + ['xdata'] + (['scales'] if args['scales'] is not None else list(scale_param.keys())))
+    excluded_keys = set(list(wav_params.keys()) + list(flags.keys()) + list(processing.keys()) + ['xdata'] + 
+                        (['scales'] if args['scales'] is not None else list(scale_param.keys())) + 
+                        ['fmin', 'fmax', 'fcut'])
     params = {k: v for k, v in args.items() if k not in excluded_keys}
     
-    return params, wav_params, scale_param, flags, xdata
+    return params, wav_params, scale_param, flags, processing, xdata
 
 def extract_duration_info(ts: timedelta) -> Tuple[float, Callable[[Union[int, float]], timedelta], str]:
     """
