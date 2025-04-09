@@ -169,7 +169,7 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         'wname': {'mor', 'mex', 'dog', 'gau', 'haa'},
         'scaletype': {'lin', 'log', 'bot'},
         'norm': {'L1', 'L2'},
-        'pad': {'zpd', 'ref', 'sym', 'per', 'non'},
+        'pad': {'zpd', 'ref', 'sym', 'per', 'none'},
         'padmode': {'r', 'b', 'l'},
         'coimethod': {'ana', 'num'},
         'coimetric': {'int', 'ene'},
@@ -227,7 +227,7 @@ def get_args(**kwargs) -> Tuple[Dict[str, Union[str, int, float, timedelta]],
         
         'pad': {
             'default': 'ref', 
-            'transform': lambda v: str(v).lower()[:3],
+            'transform': lambda v: str(v).lower()[:3] if str(v).lower() != 'none' else 'none',
             'validate': lambda v: v in VALID_OPTIONS['pad']},
         
         'padmode': {

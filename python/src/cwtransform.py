@@ -296,7 +296,7 @@ class Wavelet_Transform():
         self.compute_WT(y_ext)
 
         # Remove padding
-        if 'remove_padding' in self.params:
+        if self.params['remove_padding'] is not None:
             self.wave = self.params['remove_padding'](self.wave)
 
         # Cone of influence
