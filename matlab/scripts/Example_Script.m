@@ -177,18 +177,28 @@ LaunchWAI(date,"m6",'DOG2',Months,GPP,time,Ts,wbk,mode, ...
 LaunchWAI(date,"m6",'DOG2',Months,GPP,time,Ts,wbk,mode, ...
     'I3 - denominator: DOG2 November peak (180 days)',PeakRep,SPeaks,Peaks,"Nov")
 %-----------------
-%% Phenology %%%
-ftype = 'DOG2';
-% Start GPP : Mexican Hat April peak at 2 months
-BeginDate = PeakRep.(ftype).Apr.m2Date;
+%% Phenology
+ftype = 'DOG1';
+% Start GPP : DOG1 at 2 weeks 
+per = 'w2';
+% Mean periodic bands
+wbk = ComputeMeanPeriodicBands(per,wbk,GPP,ftype,Ts,'dj',dj);
+% Extracting dates
+mts = [3 4 5]; % Months to keep for peak detection (to be adjusted for different datasets)
+PeakApr = ExtractPeaksForBeginDates(wbk.(ftype).CoefCOI,time,wbk.(ftype).Sgn,"w2",mts);
+BeginDate = PeakApr.w2Date;
 
 % Drop dates : Second zero of Mexican Hat June peak
 per = "m6";
+ftype = 'DOG2';
 DropDate = DatesFromCenterToExtremumOrZeroDOG(PeakRep.(ftype).Jun,ftype,per,Ts); % Position of peaks
 DropDate = DropDate{:,1};
 
-% End dates
-EndDate = PeakRep.(ftype).Nov.m2Date;
+% End dates : DOG2 at 2 months
+mts = [10 11];
+ftype = 'DOG2';
+PeakNov = ExtractPeaksForEndDates(wbk.(ftype).CoefCOI,time,wbk.(ftype).Sgn,"m2",mts);
+EndDate = PeakNov.w2Date;
 
 % Plotting - Dates
 figure
