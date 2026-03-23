@@ -427,7 +427,8 @@ def extract_peaks(
     filter_per: Optional[str] = None,
     per: str = 'year',
     sgn: Optional[pd.DataFrame] = None,
-    thresh: Optional[Union[int, float]] = -np.inf
+    thresh: Optional[Union[int, float]] = -np.inf,
+    filtermethod: Optional[str] = 'closest'
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """
     Extract repeating peaks in mean periodic bands.
@@ -459,6 +460,9 @@ def extract_peaks(
         DataFrame with signs of wavelet coefficients for additional filtering
     thresh : int or float, optional
         Threshold value for peak detection
+    filtermethod : str, optional
+        Method to use for filtering peaks when multiple peaks correspond to the same filter_val.
+        Options are 'closest' (default, closest to previous period), 'first' or 'last'.
     
     Returns
     -------
@@ -687,7 +691,7 @@ def extract_peaks(
                 return coef_in[period_values.isin(filt_id)][['idx', 'loc', 'pk']]
         
     
-    # Sign of wavelet coefficients (not used)
+    # Sign of wavelet coefficients
     if sgn is None:
         sgn = pd.DataFrame(np.nan, index=x_val, columns=[pstr])
     
@@ -761,23 +765,41 @@ def extract_peaks(
                         # Try to filter using higher period if available
                         filt_idx = (idcoef['idx'] == i)
                         date_pks = idcoef.loc[filt_idx, 'loc']
-                        # Find closest peak to the higher period peak
-                        pid_prev = pstr[j-1]
-                        prev_date = rep_peak[filt_id].loc[str(i), f"{pid_prev}loc"]
-                        if j==0 or pd.isna(prev_date):
-                            warn_vals2.append(i.astype(str))
-                            # keep_idx = np.argmax(idcoef.loc[filt_idx, 'pk'])
-                            keep_idx = idcoef.loc[filt_idx, 'pk'].idxmax()
-                        else:
-                            warn_vals1.append(i.astype(str))
-                            keep_idx = np.abs(date_pks - prev_date).idxmin()
-                            # keep_idx = np.argmin(np.abs(date_pks - prev_date))
-                                
-                        # Keep only the closest (or max) peak
+                        if filtermethod=='closest':
+                            # Find closest peak to the higher period peak
+                            pid_prev = pstr[j-1]
+                            prev_date = rep_peak[filt_id].loc[str(i), f"{pid_prev}loc"]
+                            if j==0 or pd.isna(prev_date):
+                                warn_vals2.append(i.astype(str))
+                                keep_idx = idcoef.loc[filt_idx, 'pk'].idxmax()
+                            else:
+                                warn_vals1.append(i.astype(str))
+                                keep_idx = np.abs(date_pks - prev_date).idxmin()
+                        elif filtermethod=='first':
+                            # Filter out peaks above average
+                            avg_pk = idcoef.loc[filt_idx, 'pk'].mean()
+                            idcoef = idcoef.loc[~(filt_idx & (idcoef['pk'] < avg_pk))]
+                            # Recalculate filt_idx after removing rows
+                            filt_idx = (idcoef['idx'] == i)
+                            # Keep the first peak
+                            if filt_idx.any():
+                                keep_idx = idcoef.loc[filt_idx, 'loc'].idxmin()
+                            else:
+                                continue
+                        elif filtermethod=='last':
+                            # Filter out peaks above average
+                            avg_pk = idcoef.loc[filt_idx, 'pk'].mean()
+                            idcoef = idcoef.loc[~(filt_idx & (idcoef['pk'] < avg_pk))]
+                            # Recalculate filt_idx after removing rows
+                            filt_idx = (idcoef['idx'] == i)
+                            # Keep the last peak
+                            if filt_idx.any():
+                                keep_idx = idcoef.loc[filt_idx, 'loc'].idxmax()
+                            else:
+                                continue
+                        # Keep only the closest (or max), the first or the last peak
                         to_remove = idcoef.index[filt_idx & (idcoef['loc'] != idcoef.loc[keep_idx, 'loc'])]
-                        # to_remove = idcoef.index[filt_idx & (idcoef['loc'] != date_pks.iloc[keep_idx])]
                         idcoef = idcoef.drop(to_remove)
-                        
                     # Warnings
                     if any(warn_vals1):
                         warn1[filt_id][pid] = warn_vals1

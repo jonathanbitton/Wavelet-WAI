@@ -705,7 +705,8 @@ class Wavelet_Transform():
                       filter_per: Optional[str] = None,
                       per: str = 'year',
                       thresh: Optional[Union[int, float]] = -np.inf,
-                      coi: Optional[bool] = None):
+                      coi: Optional[bool] = None,
+                      filtermethod: Optional[str] = 'closest'):
         '''
         Compute peaks from wavelet coefficients
         
@@ -725,6 +726,11 @@ class Wavelet_Transform():
             Period unit for peak detection
         thresh : int, float, optional (default=-inf)
             Threshold for peak detection
+        filtermethod : str, optional (default='closest')
+            Method for filtering peaks based on filter_val and filter_per:
+            - 'closest' (default): Keep the closest peak to the previous period
+            - 'first': Keep the first peak greater than average from the filter value for each period
+            - 'last': Keep the last peak greater than average from the filter value for each period
         '''
         # Check if COI flag is provided
         if coi is None:
@@ -742,7 +748,7 @@ class Wavelet_Transform():
             coef = self.mean_coef['power']
             sgn = self.mean_coef['wave']
         
-        peak, *_ = wai_utils.extract_peaks(coef, x_val, pstr, filter_val, filter_per, per, sgn, thresh)
+        peak, *_ = wai_utils.extract_peaks(coef, x_val, pstr, filter_val, filter_per, per, sgn, thresh, filtermethod)
         
         if not hasattr(self, 'peak'):
             self.peak = {}
@@ -892,4 +898,6 @@ class Wavelet_Transform():
             wavelet = str(wname).lower()
 
         return wai_utils.compute_support_period(wavelet, per, self.params['ts'], percentout, metric)
+
+
 
