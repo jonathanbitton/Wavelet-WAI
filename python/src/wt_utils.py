@@ -414,10 +414,10 @@ def define_scales(fourier_fac: float,
         else:
             # fmax or permin specified
             if permin < 2 * dt:
-                warnings.warn('permin(fmax) does not respect the Nyquist frequency. \n A value of 2*ts(fs/2) is recommended', UserWarning, stacklevel=2)
+                warnings.warn('permin(fmax) does not respect the Nyquist frequency. \n A value of 2*ts(fs/2) is recommended except for (co)variance reconstruction', UserWarning, stacklevel=2)
         s0 = permin / fourier_fac  # Converting periods to scales using the Fourier factor
     elif s0 * fourier_fac < 2 * dt:
-        warnings.warn('smin does not respect the Nyquist frequency. \n A value of 2*ts(fs/2) for permin(fmax) is recommended', UserWarning, stacklevel=2)
+        warnings.warn('smin does not respect the Nyquist frequency. \n A value of 2*ts(fs/2) for permin(fmax) is recommended except for (co)variance reconstruction', UserWarning, stacklevel=2)
 
     # Highest scale
     if smax is None:
@@ -1601,17 +1601,18 @@ def plot_scalogram(wave: np.ndarray,
                    ts: Optional[Union[int, float, "timedelta"]] = 1, 
                    xdata: Optional[Union[np.ndarray, "pd.Series", "pd.DatetimeIndex", "DatetimeArray"]] = None, 
                    coi: Optional[np.ndarray] = None, 
-                   fper_units: str = 'period', 
+                   fper_units: Optional[str] = 'period', 
                    signif: Optional[np.ndarray] = None, 
                    plotunits: Optional[str] = None, 
-                   cmap: str = 'viridis', 
-                   title: str = 'Scalogram', 
-                   return_fig: bool = False) -> Tuple[Optional["matplotlib.figure.Figure"], Optional["matplotlib.axes.Axes"]]: 
+                   cmap: Optional[str] = 'viridis', 
+                   color_norm: Optional[str] = 'raw',
+                   title: Optional[str] = 'Scalogram', 
+                   return_fig: Optional[bool] = False) -> Tuple[Optional["matplotlib.figure.Figure"], Optional["matplotlib.axes.Axes"]]: 
     """
-    Create and display a wavelet scalogram plot.
+    Create and display a wavelet scalogram or cross-scalogram.
     
-    This function visualizes wavelet transform coefficients as a scalogram,
-    with period/frequency on the y-axis and time on the x-axis. It also
+    This function visualizes wavelet transform (cross-)coefficients as a (cross-)scalogram,
+    with period/frequency on the y-axis and time (or x-data) on the x-axis. It also
     supports plotting the cone of influence (COI) and significance contours.
     
     Parameters
@@ -1638,6 +1639,11 @@ def plot_scalogram(wave: np.ndarray,
         Only used for timedelta objects.
     cmap : str, optional (default='viridis')
         Matplotlib colormap name to use for the scalogram.
+    color_norm : str, optional (default='raw')
+        Color normalization method for the scalogram:
+        - 'raw': Normalized based on data limits (default)
+        - 'centered': Normalized based on data limits and centered on 0 (useful for cross-scalograms)
+        - 'max': Normalized based on maximum absolute value (useful for cross-scalograms)
     title : str, optional (default='Scalogram')
         Title for the plot.
     return_fig : bool, optional (default=False)
@@ -1663,6 +1669,7 @@ def plot_scalogram(wave: np.ndarray,
     """
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
+    import matplotlib.colors as mcolors
     from datetime import datetime, timedelta
     from pandas import Timestamp
     
@@ -1743,12 +1750,31 @@ def plot_scalogram(wave: np.ndarray,
         ylbl = 'Frequency'
     else:
         raise ValueError(f'fper_units value "{fper_units}" is invalid. Please use "period" or "frequency"')
-    
+            
     # Create plot
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Plot scalogram using pcolormesh for better performance
-    mesh = ax.pcolormesh(xdata, fper, np.abs(wave), shading='auto', cmap=cmap)
+    # Use only real data for wave
+    if np.iscomplex(wave).any():
+        wave = np.abs(wave)
+    # Plot scalogram using pcolormesh for better performance 
+    if color_norm == 'raw': # normalized color range based on data limits
+        mesh = ax.pcolormesh(xdata, fper, wave, shading='auto', cmap=cmap)
+    elif color_norm == 'centered': # normalized color range based on data limits and centered on 0
+        mesh = ax.pcolormesh(xdata, fper, wave, shading='auto', cmap=cmap, norm=mcolors.TwoSlopeNorm(vcenter=0))
+        if not (np.any(wave > 0) and np.any(wave < 0)):
+            import warnings
+            warnings.warn(f'Warning: color scale "{color_norm}" adapted for coefficients taking both positive and negative values. ', UserWarning, stacklevel=2)
+    elif color_norm == 'max': # normalized color range based on max(abs(wave)) and centered on 0
+        # mesh = ax.pcolormesh(xdata, fper, wave, shading='auto', cmap=cmap, norm=mcolors.CenteredNorm()) # matplotlib > 3.4.
+        absmax = np.max(np.abs(wave))
+        mesh = ax.pcolormesh(xdata, fper, wave, shading='auto', cmap=cmap, vmin=-absmax, vmax=absmax)      
+        # mesh = ax.pcolormesh(xdata, fper, wave, shading='auto', cmap=cmap, norm=mcolors.TwoSlopeNorm(vcenter=0, vmin=-absmax, vmax=absmax))
+        if not (np.any(wave > 0) and np.any(wave < 0)):
+            import warnings
+            warnings.warn(f'Warning: color scale "{color_norm}" adapted for coefficients taking both positive and negative values. ', UserWarning, stacklevel=2)
+    else: # Undefined color noramlization
+        raise ValueError(f'color normalization "{color_norm}" is invalid. Please use "raw", "centered" or "max"')
     
     # Configure axes
     ax.set_yscale('log')
@@ -1801,3 +1827,116 @@ def plot_scalogram(wave: np.ndarray,
     else:
         plt.tight_layout()
         plt.show()
+
+
+def compute_stat(wavelet: Dict[str, Any], 
+                 scales: np.ndarray, 
+                 dt: Union[int, float], 
+                 dj: Union[int, float], 
+                 cross: np.ndarray, 
+                 mode: Optional[str] = 'var', 
+                 scaletype: Optional[str] = 'log', 
+                 scut: Optional[Union[int, float]] = None, 
+                 dj_lin: Optional[Union[int, float]] = None, 
+                 base: Optional[int] = 2):
+    '''
+    Compute variance or covariance of wavelet coefficients.
+    
+    This function calculates the variance (or covariance) of wavelet coefficients 
+    based on the continuous wavelet transform reconstruction identity.
+    It is adjusted to account for the normalization of the chosen wavelet and the 
+    sampling of scales (linear, logarithmic with different bases, or both).
+
+    Parameters
+    ----------
+    wavelet : dict
+        Dictionary containing wavelet parameters including 'name', 'params', 'norm', and 'norm_fac'.
+    scales : numpy.ndarray
+        Array of scales used in the wavelet transform.
+    dt : float
+        Time step between consecutive samples.
+    dj : float
+        Scale resolution (spacing between scales in logarithmic sampling).
+    cross : numpy.ndarray
+        Cross-spectrum of the wavelet coefficients (used for covariance calculation).
+    mode : str, optional (default='var')
+        Mode of computation: 'var' for variance, 'cov' for covariance.
+    scaletype : str, optional (default='log')
+        Type of scale sampling: 'log' for logarithmic, 'lin' for linear,    or 'bot' for both.
+    scut : float, optional (default=None)
+        Scale cutoff for switching between logarithmic and linear sampling (used if scaletype='bot').
+    dj_lin : float, optional (default=None)
+        Scale resolution for linear sampling (used if scaletype='bot').
+    base : int, optional (default=2)
+        Base for logarithmic scale sampling (used if scaletype='log' or 'bot').
+
+    Returns
+    -------
+    s2rec2 : float
+        Total variance or covariance of the wavelet coefficients.
+    s2rec2scales : numpy.ndarray
+        Variance or covariance contribution from each scale.
+    cpsi : float
+        Admissibility constant for the wavelet, used for normalization.
+    '''
+    from scipy.integrate import quad
+    wname = wavelet['name']
+    scales = scales[:, np.newaxis]
+    if wname == 'mor':  # Morlet
+        # Abs value of the FT of Morlet wavelet squared norm divided by w
+        wav = lambda w: np.exp(-wavelet['params']['s2'] * (w - wavelet['params']['w0'])**2) / w
+        # Multiplying factor for variance / covariance
+        fac = 2 # Analytical wavelet & Real signal
+    elif wname[:3] == 'dog':  # DOG
+        # Abs value of the FT of DOG wavelet squared norm divided by w
+        wav = lambda w: np.exp(-wavelet['params']['s2'] * (w**2)) * (w**(2 * wavelet['params']['m'] - 1))
+        # Multiplying factor for variance / covariance
+        fac = 1 # Real wavelet & signal
+    elif wname == 'haa':  # Haar
+        # Abs value of the FT of Haar wavelet squared norm divided by w
+        wav = lambda w: (16 * (np.sin(w / 4))**4) / (w ** 3)
+        # Multiplying factor for variance / covariance
+        fac = 1 # Real wavelet & signal
+    elif wname == 'gau':  # Gauss function (NOT a wavelet transform but a filtering)
+        raise ValueError('Variance computation only holds for wavelet transforms, the Guassian function is not an admissible wavelet')
+        
+    # Calculate integral
+    cpsi, _ = quad(wav, 0, np.inf, limit=100)
+    
+    # Adding constant value and computing cpsi (admissibility constant) for normalization
+    cpsi *= abs(wavelet['norm_fac'])**2
+    
+    # Correction for covariance
+    if str(mode)[:2].lower() == 'co':
+        cross = np.real(cross)
+    
+    # Computing (co)variance
+    if scaletype == 'bot':
+        scaletype = ['lin','log']
+    
+    n = cross.shape[1]
+    if 'log' in scaletype: # logrithmic scale sampling
+        if '2' in wavelet['norm']:
+            s2fac = fac * dj * dt * np.log(base) / (cpsi * n)
+            s2rec2scales = s2fac * np.sum(cross / scales, axis=1)
+        elif '1' in wavelet['norm']:
+            s2fac = fac * dj * np.log(base) / (cpsi * n)
+            s2rec2scales = s2fac * np.sum(cross, axis=1)
+    if 'lin' in scaletype: # linear scale sampling
+        if '2' in wavelet['norm']:
+            s2fac = fac * dj_lin * dt / (cpsi * n)
+            s2rec2scaleslin = s2fac * np.sum(cross / (scales ** 2), axis=1)
+        elif '1' in wavelet['norm']:
+            s2fac = fac * dj_lin / (cpsi * n)
+            s2rec2scaleslin = s2fac * np.sum(cross / scales, axis=1)
+            
+        # Combine with log if needed
+        if len(scaletype)==2:
+            scut_idx = np.where(scut == scales)[0][0] + 1
+            # Replace linear part
+            s2rec2scales[scut_idx:] = s2rec2scaleslin[scut_idx:]
+        else:
+            s2rec2scales = s2rec2scaleslin
+            
+    s2rec2 = np.sum(s2rec2scales)
+    return s2rec2, s2rec2scales, cpsi

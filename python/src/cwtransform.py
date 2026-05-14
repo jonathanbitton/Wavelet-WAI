@@ -900,4 +900,116 @@ class Wavelet_Transform():
         return wai_utils.compute_support_period(wavelet, per, self.params['ts'], percentout, metric)
 
 
+    def cross_scalogram(self, 
+                  xdata: Optional[Union[np.ndarray, "pd.Series", "pd.DatetimeIndex", "DatetimeArray"]] = None, 
+                  Units: Optional[str] = None,
+                  mask: Optional[Union[np.ndarray, "pd.Series", "pd.DatetimeIndex", "DatetimeArray"]] = None,
+                  cmap: Optional[str] = 'seismic',
+                  color_norm: Optional[str] = 'max'):
+        '''
+        Compute the cross-scalogram
 
+        Parameters
+        ----------
+        xdata : array_like, pandas.Series, pandas.DatetimeIndex or pandas.arrays.DatetimeArray, optional (default=None)
+            x-axis data for plotting. If None, x-axis data is np.arange(signal length).
+        Units : str, optional (default=None)
+            Units for x-axis. If None, x-axis is adimensional.
+        mask : array_like, pandas.Series, pandas.DatetimeIndex, or pandas.arrays.DatetimeArray, optional (default=None)
+            Mask to apply to the cross wavelet coefficients and xdata.
+        cmap : str, optional (default='seismic')
+            Matplotlib colormap name to use for the cross-scalogram.
+        color_norm : str, optional (default='max')
+            Color normalization method for the cross-scalogram:
+            - 'raw': Normalized based on data limits (default)
+            - 'centered': Normalized based on data limits and centered on 0 (useful for cross-scalograms)
+            - 'max': Normalized based on maximum absolute value (useful for cross-scalograms)
+        '''
+        if not hasattr(self, 'cross_wave'):
+            raise ValueError('Cross wavelet coefficients not found. '
+                            'Please compute cross wavelet coefficients first using xwt.')
+        
+        coi = None if not hasattr(self, 'coi') else self.coi
+        signif = None if not hasattr(self, 'signif') else self.signif
+        
+        cross = self.cross_wave
+        
+        # Apply mask to relevant data
+        if mask is not None:
+            mask = np.asarray(mask)
+            # cross
+            cross = np.real(cross[:, mask]) 
+            # xdata
+            if xdata is not None:
+                xdata = xdata[mask]
+                if hasattr(xdata, "reset_index"):
+                    xdata = xdata.reset_index(drop=True)
+            # coi
+            if coi is not None:
+                coi = coi[mask]
+        
+        if self.params['fs'] is None:
+            wt_utils.plot_scalogram(cross, self.fper, self.params['ts'], xdata, coi, 'p', signif, Units, cmap, color_norm,'Cross-scalogram')
+        else:
+            wt_utils.plot_scalogram(cross, self.fper, self.params['fs'], xdata, coi, 'f', signif, Units, cmap, color_norm,'Cross-scalogram')
+
+    def compute_variance(self, mask = None):
+        '''
+        Compute the variance of wavelet coefficients
+
+        Parameters
+        ----------
+        mask : array_like, pandas.Series, pandas.DatetimeIndex, or pandas.arrays.DatetimeArray, optional (default=None)
+            Mask to apply to the wavelet coefficients.
+            If provided, should be of the same length as the number of data points in the wavelet coefficients.
+             This allows for focusing the variance computation on specific x-data points of interest or for cutting out regions affected by edge effects.
+            
+        Returns
+        -------
+        variance : numpy.ndarray
+            Variance of the wavelet coefficients for each scale and time point.
+        '''
+        
+        if self.scales[0]*self.wavelet['fourier_fac'] - self.params['dt'] > 1e-10:
+            print('permin(fmax) should be set to ts(fs) for improved reconstruction')
+        if self.params['pad'] != 'none':
+            print('padding should be set to none for improved reconstruction')
+
+        power = np.abs(self.wave)**2
+        if mask is not None:
+            power = power[:, mask]
+
+        return wt_utils.compute_stat(self.wavelet, self.scales,
+                                     self.params['dt'], self.params['dj'], power, 'var', 
+                                     self.params['scaletype'], self.params['scut'], self.params['dj_lin'])#time_axis = time_axis, absolute = absolute)
+    
+    def compute_covariance(self, mask = None):
+        '''
+        Compute the covariance of cross-wavelet coefficients
+
+        Parameters
+        ----------
+        mask : array_like, pandas.Series, pandas.DatetimeIndex, or pandas.arrays.DatetimeArray, optional (default=None)
+            Mask to apply to the cross-wavelet coefficients.
+            If provided, should be of the same length as the number of data points in the wavelet coefficients.
+             This allows for focusing the covariance computation on specific x-data points of interest or for cutting out regions affected by edge effects.
+
+        Returns
+        -------
+        covariance : numpy.ndarray
+            Covariance of the cross-wavelet coefficients for each scale and time point.
+        '''
+        if self.scales[0]*self.wavelet['fourier_fac'] - self.params['dt'] > 1e-10:
+            print('permin(fmax) should be set to ts(fs) for improved reconstruction')
+        if self.params['pad'] != 'none':
+            print('padding should be set to none for improved reconstruction')
+
+        cross = self.cross_wave
+        if mask is not None:
+            cross = cross[:, mask]  
+            
+        
+        return wt_utils.compute_stat(self.wavelet, self.scales,
+                                     self.params['dt'], self.params['dj'], cross, 'cov', 
+                                     self.params['scaletype'], self.params['scut'], self.params['dj_lin'])#time_axis = time_axis, absolute = absolute)
+    
