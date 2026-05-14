@@ -1,12 +1,13 @@
 # Wavelet-WAI
 
 ## Overview
-This project provides a matlab- and python-based toolkit for performing Continuous Wavelet Transform (CWT) analysis on (time-)series data. The toolkit is designed to facilitate signal processing, feature extraction, and visualization of wavelet coefficients, making it ideal for researchers and engineers working in fields such as signal processing, time-frequency analysis, and data science. 
+This project provides a matlab- and python-based toolkit for performing Continuous Wavelet Transform (CWT) analysis on (time) series data. The toolkit is designed to facilitate signal processing, feature extraction, and visualization of wavelet coefficients, making it ideal for researchers and engineers working in fields such as signal processing, time-frequency analysis, and data science. 
 It introduces the **Wavelet Area Interpretation (WAI)**, a visual approach to interpret wavelet coefficients based on areas contributing to their calculation, and exapands on possible applications in ecology.
+It also provides a method for reconstructing variance and covariance from wavelet coefficients based on the CWT reconstruction identity.
 
 The repository includes, in matlab and python:
 
-- A core implementation of the Continuous Wavelet Transform (fully customizable)
+- A core implementation of the Continuous Wavelet Transform (fully customizable), including variance and covariance reconstruction.
 - Utility functions for handling data and wavelet coefficients.
 - An implementation of the WAI, for time-series (in matlab/python) or any type of data (python only)
 - Example Jupyter notebook (python) or script (matlab) to demonstrate usage and possible applications.
@@ -17,6 +18,7 @@ The repository includes, in matlab and python:
 - Scalogram Visualization: Generate scalograms to visualize wavelet coefficients.
 - Data Utilities: Preprocess and manage series data for analysis.
 - Wavelet Area Interpretation: Analyze and interpret wavelet coefficients for feature extraction.
+- Variance and covariance reconstruction: Evaluate data statistics based on wavelet coefficients.
 - Extensibility: Modular design allows easy integration with other projects.
 
 ## Repository structure and installation
