@@ -1,6 +1,8 @@
 ## **Description**
 This project presents a continuous wavelet transform implementation and a signal analysis method based on the **Wavelet Area Interpretation** for matlab.
 
+It also implements a wavelet-based covariance reconstruction, based on the CWT reconstruction identity, adapted for computing eddy-covariance fluxes.
+
 ## Installation
 Clone the repository:
 ```bash
@@ -18,9 +20,10 @@ See scripts/Example_Script.m for an application or notebooks/Example.ipynb from 
 ```
 matlab/
 ├── scripts/                                         # Scripts folder
-│   └── Example_Script.m                             # Example script
+│   └── Example_Script.m                             # Example script for WAI
 ├── src/                                             # Main functions
 │   ├── coefvalues.m                                 # Compute mean period bands
+│   ├── Compute_stat.m                               # Compute variance or covariance based on wavelet coefficients
 │   ├── ComputeWave.m                                # Compute wavelet in time domain
 │   ├── cwtransform.m                                # main CWT functions
 │   ├── DatesFromCenterToExtremumOrZeroDOG.m         # Date translation
@@ -28,6 +31,8 @@ matlab/
 │   ├── DiracCOIComputation.m                        # Compute Cone of Influence (COI) using dirac impulses
 │   ├── DOGCOI.m                                     # Compute COI for DOG wavelets
 │   ├── ExtractPeaks.m                               # Extract peaks in period bands
+│   ├── ExtractPeaksForBeginDates.m                  # Extract peaks in period bands for the start of a trend
+│   ├── ExtractPeaksForEndDates.m                    # Extract peaks in period bands for the end of a trend
 │   ├── GetArgs.m                                    # Extract and format user-defined arguments
 │   ├── LaunchWAI.m                                  # Launch WAI-related computations and plot
 │   ├── plotscalogram.m                              # Plot scalogram
@@ -36,7 +41,9 @@ matlab/
 │   ├── SupportWav.m                                 # Calculate wavelet support
 │   └──UnitsAndFctHandles.m                          # Convert units and define function handles
 ├── data/                                            # Data folder
-│   └── GPPdata.txt
+│   ├── GPPdata.txt                                  # Example data file (for WAI)
+│   ├── Hesse_Aux_Data.txt                           # Driving variables at Hesse
+│   └── Hesse_Flux_Data.txt                          # Fluxes values at Hesse
 ├── setup.m                                          # Setup file for scritps
 └── README.md                                        # Project documentation
 ```
