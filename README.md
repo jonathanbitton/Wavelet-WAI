@@ -25,7 +25,7 @@ The repository includes, in matlab and python:
 See the "matlab" or "python" README.md files for explanations depending on language used.
 
 ## Usage
-See example files (python/notebooks/Example.ipynb or matlab/scripts/Example_Script.m) for a detailed case-study. For a more guided analysis, refering to the notebook is recommended.
+See example files (python/notebooks/Example_WAI.ipynb, python/notebooks/Example_cov.ipynb or matlab/scripts/Example_Script.m) for a detailed case-study. For a more guided analysis, refering to the notebook is recommended.
 
 ## Contributing
 Contributions are welcome! If you’d like to contribute, please fork the repository and submit a pull request. For major changes, please open an issue first to discuss your ideas.
